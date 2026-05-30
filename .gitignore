@@ -1,0 +1,11 @@
+*.py[cod]
+__pycache__/
+
+# Packages
+/*.egg*/
+/build/
+/dist/
+
+# Unit test / coverage reports
+/.coverage*
+/coverage.xml

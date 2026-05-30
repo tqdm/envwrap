@@ -1,0 +1,57 @@
+default_language_version:
+  python: python3
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+  - id: check-added-large-files
+  - id: check-case-conflict
+  - id: check-docstring-first
+  - id: check-executables-have-shebangs
+  - id: check-toml
+  - id: check-merge-conflict
+  - id: check-yaml
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: mixed-line-ending
+  - id: sort-simple-yaml
+  - id: trailing-whitespace
+    exclude: ^README.rst$
+- repo: local
+  hooks:
+  - id: todo
+    name: Check TODO
+    language: pygrep
+    entry: WIP
+    args: [-i]
+    types: [text]
+    exclude: ^(.pre-commit-config.yaml|.github/workflows/test.yml)$
+  - id: pytest
+    name: pytest
+    language: python
+    entry: env PYTHONPATH=. pytest
+    args: [-qq, --durations=1]
+    types: [python]
+    pass_filenames: false
+    additional_dependencies: [pytest-cov]
+- repo: https://github.com/PyCQA/flake8
+  rev: 7.3.0
+  hooks:
+  - id: flake8
+    args: [-j8]
+    additional_dependencies:
+    - flake8-broken-line
+    - flake8-bugbear
+    - flake8-comprehensions
+    - flake8-debugger
+    - flake8-isort
+    - flake8-pyproject
+- repo: https://github.com/asottile/pyupgrade
+  rev: v3.21.2
+  hooks:
+  - id: pyupgrade
+    args: [--py37-plus]
+- repo: https://github.com/PyCQA/isort
+  rev: 9.0.0a3
+  hooks:
+  - id: isort
