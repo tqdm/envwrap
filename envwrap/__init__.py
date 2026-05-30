@@ -1,29 +1,97 @@
 import os
-from functools import partial, partialmethod
+from functools import cache, partial, partialmethod
 from inspect import signature
+from pathlib import Path, PurePath
+from warnings import warn
+
+from platformdirs import PlatformDirs
 
 
-def envwrap(prefix, types=None, is_method=False):
+def read_config(fpath: PurePath):
+    match fpath.suffix.lower():
+        case ".toml":
+            try:
+                from tomllib import loads # py>=3.11
+            except ModuleNotFoundError:
+                from toml import loads
+        case ".yaml" | ".yml":
+            from yaml import safe_load as loads
+        case ".json":
+            from json import loads
+        case ".ini" | ".cfg":
+            from configparser import ConfigParser
+            parser = ConfigParser()
+            parser.read_string(fpath.read_text())
+            return {sec: dict(parser.items(sec)) for sec in parser.sections()}
+        case _:
+            raise TypeError(f"Unsupported config filetype: {fpath}")
+
+    return loads(fpath.read_text())
+
+
+@cache
+def get_defaults(name: str, app: str, func: str):
+    conf = PlatformDirs(name, False)
+    overrides = {}
+    for pth, base in (
+        (conf.site_config_path, name),
+        (conf.site_config_path, app),
+        (conf.user_config_path, name),
+        (conf.user_config_path, app),
+        (Path("."), name),
+    ):
+        for ext in ('cfg', 'ini', 'json', 'yml', 'yaml', 'toml'):
+            if (fpath := pth / f"{base}.{ext}").is_file():
+                try:
+                    cfg = read_config(fpath)
+                    overrides.update(cfg)
+                    if base == name:
+                        # app.func.a,func.a,app.a,a
+                        if app in cfg:
+                            overrides.update(cfg[app])
+                        if func in cfg:
+                            overrides.update(cfg[func])
+                        if app in cfg and func in cfg[app]:
+                            overrides.update(cfg[app][func])
+                    elif base == app:
+                        # func.a,a
+                        if func in cfg:
+                            overrides.update(cfg[func])
+                except Exception:
+                    pass
+    overrides.update((k[len(prefix):].lower(), v)
+                     for prefix in (f"{name}_".upper(), f"{name}_{app}_".upper(),
+                                    f"{name}_{func}_".upper(), f"{name}_{app}_{func}_".upper())
+                     for k, v in os.environ.items() if k.startswith(prefix))
+    return overrides
+
+
+def envwrap(name: str, app: str = "", types: dict | None = None, is_method=False):
     """
-    Override parameter defaults via `os.environ[prefix + param_name]`.
-    Maps UPPER_CASE env vars map to lower_case param names.
-    camelCase isn't supported (because Windows ignores case).
-
-    Precedence (highest first):
-
-    - call (`foo(a=3)`)
-    - environ (`FOO_A=2`)
+    Override parameter defaults via environment variables & config files.
+    Precedence (descending):
+    - call (`func(a=3)`)
+    - environ (`NAME_APP_FUNC_A=2`, `NAME_FUNC_A=2`, `NAME_APP_A=2`, `NAME_A=2`)
+      - UPPER_CASE env vars -> lower_case param names
+      - other cases such as camelCase aren't supported because Windows ignores case
+    - config file:
+      - ./{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}
+      - platformdirs.{user,site}_config_path(name, False)/
+        - {app}.{toml,yaml,yml,json,ini,cfg}::{func.a,a}
+        - {name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}
     - signature (`def foo(a=1)`)
 
     Parameters
     ----------
-    prefix  : str
-        Env var prefix, e.g. "FOO_"
-    types  : dict, optional
+    name:
+        Configuration name.
+    app:
+        Application name.
+    types:
         Fallback mappings `{'param_name': type, ...}` if types cannot be
         inferred from function signature.
         Consider using `types=collections.defaultdict(lambda: ast.literal_eval)`.
-    is_method  : bool, optional
+    is_method:
         Whether to use `functools.partialmethod`. If (default: False) use `functools.partial`.
 
     Examples
@@ -31,7 +99,7 @@ def envwrap(prefix, types=None, is_method=False):
     ```
     $ cat foo.py
     from envwrap import envwrap
-    @envwrap("FOO_")
+    @envwrap("FOO")
     def test(a=1, b=2, c=3):
         print(f"received: a={a}, b={b}, c={c}")
 
@@ -41,18 +109,21 @@ def envwrap(prefix, types=None, is_method=False):
     """
     if types is None:
         types = {}
-    i = len(prefix)
-    env_overrides = {k[i:].lower(): v for k, v in os.environ.items() if k.startswith(prefix)}
+    if name[-1] == "_":
+        name = name[:-1]
+        warn("Trailing underscore in `name` is automatic", DeprecationWarning, stacklevel=2)
+
     part = partialmethod if is_method else partial
 
     def wrap(func):
         params = signature(func).parameters
+        env_overrides = get_defaults(name, app, func.__name__)
         # ignore unknown env vars
         overrides = {k: v for k, v in env_overrides.items() if k in params}
         # infer overrides' `type`s
         for k in overrides:
             param = params[k]
-            if param.annotation is not param.empty:  # typehints
+            if param.annotation is not param.empty: # typehints
                 for typ in getattr(param.annotation, '__args__', (param.annotation,)):
                     try:
                         overrides[k] = typ(overrides[k])
@@ -60,12 +131,13 @@ def envwrap(prefix, types=None, is_method=False):
                         pass
                     else:
                         break
-            elif param.default is not None:  # type of default value
+            elif param.default is not None:         # type of default value
                 overrides[k] = type(param.default)(overrides[k])
             else:
-                try:  # `types` fallback
+                try:                                # `types` fallback
                     overrides[k] = types[k](overrides[k])
-                except KeyError:  # keep unconverted (`str`)
+                except KeyError:                    # keep unconverted (`str`)
                     pass
         return part(func, **overrides)
+
     return wrap

@@ -33,7 +33,10 @@ repos:
     args: [-qq, --durations=1]
     types: [python]
     pass_filenames: false
-    additional_dependencies: [pytest-cov]
+    additional_dependencies:
+    - pytest-cov
+    - platformdirs
+    - PyYAML
 - repo: https://github.com/PyCQA/flake8
   rev: 7.3.0
   hooks:

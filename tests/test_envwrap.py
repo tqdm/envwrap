@@ -12,7 +12,7 @@ def set_env():
 def test_envwrap():
     from envwrap import envwrap
 
-    @envwrap("FOO_")
+    @envwrap("FOO")
     def test(a=1, b=2, c=3):
         return {"a": a, "b": b, "c": c}
 
