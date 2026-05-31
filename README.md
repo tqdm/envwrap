@@ -1,3 +1,34 @@
 # envwrap
 
-WiP extraction of `tqdm.utils.envwrap`, pending https://github.com/pypi/support/issues/10668.
+Override parameter defaults via environment variables & config files.
+
+```py
+import envwrap
+
+@envwrap.envwrap("name", "app")
+def func(a=1):
+    ...
+```
+
+Precedence (descending):
+
+- call (`func(a=3)`)
+- environment (`NAME_APP_FUNC_A=2`, `NAME_FUNC_A=2`, `NAME_APP_A=2`, `NAME_A=2`)
+  - `UPPER_CASE` env vars -> `lower_case` param names
+  - other cases aren't supported because Windows ignores case
+- config file:
+  - ./`{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
+  - [platformdirs](https://platformdirs.readthedocs.io/en/latest/parameters.html).{user,site}_config_path(name, False)/
+    - `{app}.{toml,yaml,yml,json,ini,cfg}::{func.a,a}`
+    - `{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
+- signature (`def foo(a=1)`)
+
+## Advanced Usage
+
+### Live-reload
+
+To force re-reading config files & environment variables without restarting the process:
+
+```py
+envwrap.get_defaults.cache_clear()
+```

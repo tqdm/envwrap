@@ -72,14 +72,14 @@ def envwrap(name: str, app: str = "", types: dict | None = None, is_method=False
     Override parameter defaults via environment variables & config files.
     Precedence (descending):
     - call (`func(a=3)`)
-    - environ (`NAME_APP_FUNC_A=2`, `NAME_FUNC_A=2`, `NAME_APP_A=2`, `NAME_A=2`)
-      - UPPER_CASE env vars -> lower_case param names
-      - other cases such as camelCase aren't supported because Windows ignores case
+    - environment (`NAME_APP_FUNC_A=2`, `NAME_FUNC_A=2`, `NAME_APP_A=2`, `NAME_A=2`)
+        - `UPPER_CASE` env vars -> `lower_case` param names
+        - other cases aren't supported because Windows ignores case
     - config file:
-      - ./{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}
-      - platformdirs.{user,site}_config_path(name, False)/
-        - {app}.{toml,yaml,yml,json,ini,cfg}::{func.a,a}
-        - {name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}
+        - ./`{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
+        - platformdirs.{user,site}_config_path(name, False)/
+            - `{app}.{toml,yaml,yml,json,ini,cfg}::{func.a,a}`
+            - `{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
     - signature (`def foo(a=1)`)
 
     Parameters
@@ -97,16 +97,14 @@ def envwrap(name: str, app: str = "", types: dict | None = None, is_method=False
 
     Examples
     --------
-    ```
-    $ cat foo.py
-    from envwrap import envwrap
-    @envwrap("FOO")
-    def test(a=1, b=2, c=3):
-        print(f"received: a={a}, b={b}, c={c}")
-
-    $ FOO_A=42 FOO_C=1337 python -c 'import foo; foo.test(c=99)'
+    >>> os.environ.update(dict(FOO_A="7", FOO_TEST_A="42", FOO_C="1337"))
+    >>> from envwrap import envwrap
+    >>> @envwrap("FOO")
+    >>> def test(a=1, b=2, c=3):
+    ...     print(f"received: a={a}, b={b}, c={c}")
+    ...
+    >>> test(c=99)
     received: a=42, b=2, c=99
-    ```
     """
     if types is None:
         types = {}
