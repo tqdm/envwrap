@@ -30,7 +30,7 @@ repos:
     name: pytest
     language: python
     entry: env PYTHONPATH=. pytest
-    args: [-qq, --durations=1]
+    args: [--cov=envwrap]
     types: [python]
     pass_filenames: false
     additional_dependencies:

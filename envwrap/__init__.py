@@ -7,7 +7,7 @@ from warnings import warn
 from platformdirs import PlatformDirs
 
 
-def read_config(fpath: PurePath):
+def read_config(fpath: PurePath) -> dict[str]:
     match fpath.suffix.lower():
         case ".toml":
             try:
@@ -31,6 +31,7 @@ def read_config(fpath: PurePath):
 
 @cache
 def get_defaults(name: str, app: str, func: str):
+    """in-memory (functools.cache) of overrides extracted from config files & env vars"""
     conf = PlatformDirs(name, False)
     overrides = {}
     for pth, base in (
