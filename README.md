@@ -32,3 +32,29 @@ To force re-reading config files & environment variables without restarting the 
 ```py
 envwrap.get_defaults.cache_clear()
 ```
+
+### Debugging
+
+A CLI tool can print defaults. For example, with this config:
+
+```toml
+# config file: foo.toml
+[test]
+a = 1337
+b = 2
+```
+
+```sh
+python -m envwrap --help
+FOO_A=42 python -m envwrap foo test
+```
+
+will print:
+
+```py
+>>> @envwrap.envwrap('foo', '')
+>>> def test(...):
+...    ...
+will use defaults:
+{'a': '42', 'b': 2, ...}
+```

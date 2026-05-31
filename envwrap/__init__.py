@@ -1,3 +1,4 @@
+import logging
 import os
 from functools import cache, partial, partialmethod
 from inspect import signature
@@ -6,8 +7,11 @@ from warnings import warn
 
 from platformdirs import PlatformDirs
 
+log = logging.getLogger(__name__)
+
 
 def read_config(fpath: PurePath) -> dict[str]:
+    log.debug("Reading: %s", fpath)
     match fpath.suffix.lower():
         case ".toml":
             try:
@@ -41,6 +45,9 @@ def get_defaults(name: str, app: str, func: str):
         (conf.user_config_path, app),
         (Path("."), name),
     ):
+        if not base:
+            continue
+        log.debug("Searching in %s/%s.*", pth, base)
         for ext in ('cfg', 'ini', 'json', 'yml', 'yaml', 'toml'):
             if (fpath := pth / f"{base}.{ext}").is_file():
                 try:
@@ -58,12 +65,17 @@ def get_defaults(name: str, app: str, func: str):
                         # func.a,a
                         if func in cfg:
                             overrides.update(cfg[func])
-                except Exception:
-                    pass
-    overrides.update((k[len(prefix):].lower(), v)
-                     for prefix in (f"{name}_".upper(), f"{name}_{app}_".upper(),
-                                    f"{name}_{func}_".upper(), f"{name}_{app}_{func}_".upper())
-                     for k, v in os.environ.items() if k.startswith(prefix))
+                except Exception as exc:
+                    log.debug(f"Exception ignored: {exc}")
+    if app:
+        prefixes = name, f"{name}_{app}", f"{name}_{func}", f"{name}_{app}_{func}"
+    else:
+        prefixes = name, f"{name}_{func}"
+    for prefix in prefixes:
+        prefix = prefix.upper() + "_"
+        log.debug(f"Looking for variables: {prefix}*")
+        overrides.update(
+            (k[len(prefix):].lower(), v) for k, v in os.environ.items() if k.startswith(prefix))
     return overrides
 
 
@@ -119,6 +131,7 @@ def envwrap(name: str, app: str = "", types: dict | None = None, is_method=False
         env_overrides = get_defaults(name, app, func.__name__)
         # ignore unknown env vars
         overrides = {k: v for k, v in env_overrides.items() if k in params}
+        log.debug("Loaded overrides for %s: %s", func.__name__, overrides)
         # infer overrides' `type`s
         for k in overrides:
             param = params[k]
@@ -137,6 +150,7 @@ def envwrap(name: str, app: str = "", types: dict | None = None, is_method=False
                     overrides[k] = types[k](overrides[k])
                 except KeyError:                    # keep unconverted (`str`)
                     pass
+        log.debug("Typed overrides: %s", overrides)
         return part(func, **overrides)
 
     return wrap
