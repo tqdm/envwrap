@@ -1,0 +1,74 @@
+name: ci
+on:
+  push:
+  pull_request:
+  schedule: [{cron: '3 2 * * 6'}]  # M H d m w (Sat 2:03)
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || !contains('OWNER,MEMBER,COLLABORATOR', github.event.pull_request.author_association)
+    strategy:
+      matrix:
+        python: [3.8, 3.9, '3.10', 3.11, 3.12, 3.13, 3.14]
+        os: [ubuntu]
+        include: [{os: macos, python: 3.13}, {os: windows, python: 3.13}]
+    runs-on: ${{ matrix.os }}-latest
+    timeout-minutes: 5
+    defaults: {run: {shell: bash}}
+    steps:
+    - uses: actions/checkout@v6
+      with: {fetch-depth: 0}
+    - uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python }}
+    - run: pip install -e .[dev]
+    - run: pytest --cov=envwrap --cov-report=xml
+    - uses: coverallsapp/github-action@v2
+      with:
+        flag-name: ${{ matrix.python }}-${{ matrix.os }}
+        parallel: true
+    - uses: codecov/codecov-action@v6
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        flags: ${{ matrix.python }}, ${{ matrix.os }}
+    - name: codacy
+      run: |
+        bash <(curl -fsL https://coverage.codacy.com/get.sh) report -l Python -r coverage.xml --partial || :
+      env:
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+  finish:
+    continue-on-error: ${{ github.event_name != 'push' }}
+    needs: test
+    runs-on: ubuntu-slim
+    steps:
+    - uses: coverallsapp/github-action@v2
+      with: {parallel-finished: true}
+    - name: codacy
+      run: |
+        bash <(curl -fsL https://coverage.codacy.com/get.sh) final || :
+      env:
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions: {contents: write, id-token: write, packages: write}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GH_TOKEN || github.token }}
+    - uses: actions/setup-python@v6
+      with: {python-version: '3.x'}
+    - id: dist
+      uses: casperdcl/deploy-pypi@v3
+      with:
+        upload: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}
+        build: true
+    - if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+      name: Release
+      run: |
+        changelog=$(git log --pretty='format:%d%n- %s%n%b---' $(git tag --sort=v:refname | tail -n2 | head -n1)..HEAD)
+        tag="${GITHUB_REF#refs/tags/}"
+        gh release create --title "tqdm $tag stable" --draft --notes "$changelog" "$tag" dist/${{ steps.dist.outputs.whl }} dist/${{ steps.dist.outputs.whl_asc }}
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}

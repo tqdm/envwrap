@@ -2,6 +2,8 @@
 requires = ["setuptools>=42", "setuptools-scm[toml]>=3.4"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools_scm]
+
 [tool.setuptools.packages.find]
 exclude = ["tests"]
 
@@ -15,9 +17,9 @@ dynamic = ["version"]
 maintainers = [{name = "tqdm developers", email = "devs@tqdm.ml"}]
 description = "Override parameter defaults via environment variables & config files"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 keywords = ["config", "environment", "env", "defaults", "partial", "appdir", "appdirs", "platformdirs"]
-license = "MPL-2.0"
+license = {text = "MPL-2.0"}
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

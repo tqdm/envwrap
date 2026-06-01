@@ -1,6 +1,12 @@
 import logging
 import os
-from functools import cache, partial, partialmethod
+from functools import partial, partialmethod
+
+try:
+    from functools import cache  # py>=3.9
+except ImportError:
+    from functools import lru_cache
+    cache = lru_cache(maxsize=None)
 from inspect import signature
 from pathlib import Path, PurePath
 from warnings import warn
@@ -10,25 +16,25 @@ from platformdirs import PlatformDirs
 log = logging.getLogger(__name__)
 
 
-def read_config(fpath: PurePath) -> dict[str]:
+def read_config(fpath: PurePath) -> dict:
     log.debug("Reading: %s", fpath)
-    match fpath.suffix.lower():
-        case ".toml":
-            try:
-                from tomllib import loads # py>=3.11
-            except ModuleNotFoundError:
-                from toml import loads
-        case ".yaml" | ".yml":
-            from yaml import safe_load as loads
-        case ".json":
-            from json import loads
-        case ".ini" | ".cfg":
-            from configparser import ConfigParser
-            parser = ConfigParser()
-            parser.read_string(fpath.read_text())
-            return {sec: dict(parser.items(sec)) for sec in parser.sections()}
-        case _:
-            raise TypeError(f"Unsupported config filetype: {fpath}")
+    ext = fpath.suffix.lower()[1:]
+    if ext == "toml":
+        try:
+            from tomllib import loads  # py>=3.11
+        except ModuleNotFoundError:
+            from toml import loads
+    elif ext in ("yaml", "yml"):
+        from yaml import safe_load as loads
+    elif ext == "json":
+        from json import loads
+    elif ext in ("ini", "cfg"):
+        from configparser import ConfigParser
+        parser = ConfigParser()
+        parser.read_string(fpath.read_text())
+        return {sec: dict(parser.items(sec)) for sec in parser.sections()}
+    else:
+        raise TypeError(f"Unsupported config filetype: {fpath}")
 
     return loads(fpath.read_text())
 
@@ -79,7 +85,7 @@ def get_defaults(name: str, app: str, func: str):
     return overrides
 
 
-def envwrap(name: str, app: str = "", types: dict | None = None, is_method=False):
+def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
     """
     Override parameter defaults via environment variables & config files.
     Precedence (descending):

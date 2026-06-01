@@ -45,4 +45,3 @@ def test_conf(tmp_path):
     finally:
         os.chdir(pwd)
         cfg.unlink()
-        tmp_path.rmdir()

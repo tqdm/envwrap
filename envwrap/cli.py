@@ -13,13 +13,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     logging.basicConfig(
         level={0: logging.INFO, 1: logging.DEBUG}.get(args.verbose, logging.NOTSET))
-    match len(args.args):
-        case 2:
-            app = ""
-        case 3:
-            app = args.args[1]
-        case _:
-            raise ValueError("Usage: envwrap <config_name> [<app_name>] <func_name>")
+    if len(args.args) == 2:
+        app = ""
+    elif len(args.args) == 3:
+        app = args.args[1]
+    else:
+        raise ValueError("Usage: envwrap <config_name> [<app_name>] <func_name>")
     name = args.args[0]
     func = args.args[-1]
     print(f">>> @envwrap.envwrap('{name}', '{app}')", f">>> def {func}(...):", "...    ...",
