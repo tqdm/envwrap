@@ -32,7 +32,15 @@ def read_config(fpath: PurePath) -> dict:
         from configparser import ConfigParser
         parser = ConfigParser()
         parser.read_string(fpath.read_text())
-        return {sec: dict(parser.items(sec)) for sec in parser.sections()}
+        res = {sec: dict(parser.items(sec)) for sec in parser.sections() if sec.count(".") == 0}
+        for sec in parser.sections():
+            if sec.count(".") == 1:
+                parent, child = sec.split(".", 1)
+                res.setdefault(parent, {}).setdefault(child, {})
+                res[parent][child] |= parser.items(sec)
+            elif sec.count(".") > 1:
+                warn(f"Skipping nested section: {sec}", UserWarning, stacklevel=2)
+        return res
     else:
         raise TypeError(f"Unsupported config filetype: {fpath}")
 

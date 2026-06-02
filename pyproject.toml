@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=6", "pytest-cov"]
+dev = ["pytest>=6", "pytest-cov", "toml"]
 
 [project.scripts]
 envwrap = "envwrap.cli:main"

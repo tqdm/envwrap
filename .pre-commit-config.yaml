@@ -37,6 +37,7 @@ repos:
     - pytest-cov
     - platformdirs
     - PyYAML
+    - toml
 - repo: https://github.com/PyCQA/flake8
   rev: 7.3.0
   hooks:
