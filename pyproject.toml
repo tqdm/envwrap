@@ -46,6 +46,9 @@ dev = ["pytest>=6", "pytest-cov", "toml"]
 [project.scripts]
 envwrap = "envwrap.cli:main"
 
+[tool.bandit]
+exclude_dirs = ["tests"]
+
 [tool.flake8]
 max_line_length = 99
 extend_ignore = ["E261"]

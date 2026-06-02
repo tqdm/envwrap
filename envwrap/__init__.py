@@ -1,3 +1,4 @@
+"""Override parameter defaults via environment variables & config files."""
 import logging
 import os
 from functools import partial, partialmethod
@@ -49,7 +50,7 @@ def read_config(fpath: PurePath) -> dict:
 
 @cache
 def get_defaults(name: str, app: str, func: str):
-    """in-memory (functools.cache) of overrides extracted from config files & env vars"""
+    """In-memory (functools.cache) of overrides extracted from config files & env vars."""
     conf = PlatformDirs(name, False)
     overrides = {}
     for pth, base in (
@@ -94,8 +95,8 @@ def get_defaults(name: str, app: str, func: str):
 
 
 def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
-    """
-    Override parameter defaults via environment variables & config files.
+    """Function decorator overriding default arguments.
+
     Precedence (descending):
     - call (`func(a=3)`)
     - environment (`NAME_APP_FUNC_A=2`, `NAME_FUNC_A=2`, `NAME_APP_A=2`, `NAME_A=2`)
@@ -131,6 +132,7 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
     ...
     >>> test(c=99)
     received: a=42, b=2, c=99
+
     """
     if types is None:
         types = {}
@@ -154,7 +156,7 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
                     try:
                         overrides[k] = typ(overrides[k])
                     except Exception:
-                        pass
+                        log.debug("Failed to convert %s to %s", overrides[k], typ)
                     else:
                         break
             elif param.default is not None:         # type of default value
