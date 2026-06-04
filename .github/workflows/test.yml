@@ -69,6 +69,6 @@ jobs:
       run: |
         changelog=$(git log --pretty='format:%d%n- %s%n%b---' $(git tag --sort=v:refname | tail -n2 | head -n1)..HEAD)
         tag="${GITHUB_REF#refs/tags/}"
-        gh release create --title "tqdm $tag stable" --draft --notes "$changelog" "$tag" dist/${{ steps.dist.outputs.whl }} dist/${{ steps.dist.outputs.whl_asc }}
+        gh release create --title "envwrap $tag beta" --draft --notes "$changelog" "$tag" dist/${{ steps.dist.outputs.whl }}
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}

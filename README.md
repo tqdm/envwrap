@@ -5,6 +5,10 @@
 [![codecov](https://codecov.io/gh/tqdm/envwrap/graph/badge.svg?token=PEWICBIPVW)](https://codecov.io/gh/tqdm/envwrap)
 [![codacy](https://app.codacy.com/project/badge/Grade/6ca7a441560444489fd5c5b1548ab0de)](https://app.codacy.com/gh/tqdm/envwrap/dashboard)
 
+[![releases](https://img.shields.io/pypi/v/envwrap.svg?label=changelog)](https://github.com/tqdm/envwrap/releases)
+[![pypi/envwrap](https://img.shields.io/pypi/pyversions/envwrap.svg?logo=python&logoColor=white)](https://pypi.org/project/envwrap)
+[![conda-forge::envwrap](https://img.shields.io/conda/v/conda-forge/envwrap.svg?label=conda-forge&logo=conda-forge)](https://anaconda.org/conda-forge/envwrap)
+
 Override parameter defaults via environment variables & config files.
 
 ```py
@@ -27,6 +31,17 @@ Precedence (descending):
     - `{app}.{toml,yaml,yml,json,ini,cfg}::{func.a,a}`
     - `{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
 - signature (`def foo(a=1)`)
+
+## Installation
+
+Any one of:
+
+- `pip install envwrap`
+- `conda install -c conda-forge envwrap`
+- `pip install "git+https://github.com/tqdm/envwrap@main"`
+
+> [!TIP]
+> Note that [`tqdm`](https://github.com/tqdm/tqdm) ships with a basic [`tqdm.utils.envwrap`](https://tqdm.github.io/docs/tqdm.utils/#envwrap), which falls back to the original env-var-only (no config file support) implementation if `import envwrap` fails.
 
 ## Advanced Usage
 
