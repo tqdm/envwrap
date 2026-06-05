@@ -45,6 +45,41 @@ Any one of:
 
 ## Advanced Usage
 
+### CLI integration
+
+```py
+"""CLI example program using envwrap for configuration management.
+
+Usage:
+  myapp.py [options] <arg1> [<arg2>]
+
+Options:
+  -h, --help    Show this help message and exit.
+  -o=<value>, --option=<value>  An option [default: foo].
+
+Arguments:
+  <arg1>         An argument.
+  <arg2>         An integer argument [default: 2:int].
+"""
+import argopt, shtab, envwrap
+
+ONLY_PASS_VALID = True # trim envwrap defaults based on parser's valid actions
+
+if __name__ == "__main__":
+    parser = argopt.argopt(__doc__)
+    shtab.add_argument_to(parser)
+
+    # get defaults from `MYAPP[_CLI]_*`, `myapp[/cli].{toml,yml,json,ini}::[cli.]*`
+    defaults = envwrap.get_defaults("myapp", "", "cli")
+    if ONLY_PASS_VALID:
+        valid = {i.dest for i in parser._actions}
+        defaults = {k: defaults[k] for k in defaults.keys() & valid}
+
+    parser.set_defaults(**defaults)
+    args = parser.parse_args()
+    print(args)
+```
+
 ### Live-reload
 
 To force re-reading config files & environment variables without restarting the process:
