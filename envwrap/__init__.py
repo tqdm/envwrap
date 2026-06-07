@@ -158,9 +158,9 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
 
     def wrap(func):
         params = signature(func).parameters
-        env_overrides = get_defaults(name, app, func.__name__)
-        # ignore unknown env vars
-        overrides = {k: v for k, v in env_overrides.items() if k in params}
+        defaults = get_defaults(name, app, func.__name__)
+        # ignore unknown params
+        overrides = {k: v for k, v in defaults.items() if k in params}
         log.debug("Loaded overrides for %s: %s", func.__name__, overrides)
         # infer overrides' `type`s
         for k in overrides:

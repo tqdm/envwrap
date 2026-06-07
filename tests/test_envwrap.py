@@ -43,29 +43,42 @@ def set_env():
     get_defaults.cache_clear()
 
 
-def funcname(a=1, b=2, c=3, d=4, e=5, f=6):
+def funcname(a: int = None, b=2, c=3, d=4, e=5, f=6):
     return {'a': a, 'b': b, 'c': c, 'd': d, 'e': e, 'f': f}
 
 
 def test_env():
-    f = envwrap('envwrap', 'testenv')(funcname)
-    assert f(c=99) == {'a': 1, 'b': 42, 'c': 99, 'd': 360, 'e': 101, 'f': 404}
-    f = envwrap('envwrap')(funcname)
-    assert f(c=99) == {'a': 1, 'b': 42, 'c': 99, 'd': 4, 'e': 101, 'f': 6}
+    wrapped = envwrap('envwrap', 'testenv')(funcname)
+    assert wrapped(c=99) == {'a': None, 'b': 42, 'c': 99, 'd': 360, 'e': 101, 'f': 404}
+    wrapped = envwrap('envwrap')(funcname)
+    assert wrapped(c=99) == {'a': None, 'b': 42, 'c': 99, 'd': 4, 'e': 101, 'f': 6}
 
 
 @pytest.mark.parametrize('ext', ['toml', 'yaml', 'yml', 'json', 'ini', 'cfg'])
-def test_conf(tmp_path, ext):
+@pytest.mark.parametrize('base', ['cfgwrap', 'testcfg'])
+def test_conf(tmp_path, base, ext):
     if version_info < (3, 9) and ext in ('ini', 'cfg'):
         pytest.skip("configparser dict merging requires python>=3.9")
     config = {
-        'testcfg': {'b': 43, 'c': 1338, 'd': 361, 'funcname': {'f': 405}}, 'funcname': {'e': 102}}
-    write_config(tmp_path / f"cfgwrap.{ext}", config)
+        'testcfg': {'b': 43, 'c': 1338, 'd': 361,
+                    'funcname': {'f': 405}}, 'funcname': {'e': 102, 'a': 0},
+        'cfgwrap': {'b': -1, 'e': -2, 'f': -3, 'funcname': {'e': -4}}}
+    write_config(tmp_path / f"{base}.{ext}", config)
     pwd = os.curdir
     os.chdir(tmp_path)
     try:
-        f = envwrap('cfgwrap', 'testcfg')(funcname)
-        assert f(c=98) == {'a': 1, 'b': 43, 'c': 98, 'd': 361, 'e': 102, 'f': 405}
+        wrapped = envwrap('cfgwrap', 'testcfg')(funcname)
+        if base == 'cfgwrap':
+            assert wrapped(c=98) == {'a': 0, 'b': 43, 'c': 98, 'd': 361, 'e': 102, 'f': 405}
+        else:
+            assert wrapped(c=98) == {'a': None, 'b': 2, 'c': 98, 'd': 4, 'e': 5, 'f': 6}
+        assert int(get_defaults(base, 'testcfg', 'funcname')['a']) == 0
+        assert int(get_defaults(base, 'testcfg', 'funcname')['f']) == 405
+        assert int(get_defaults(base, 'testcfg', 'miss-n/a')['d']) == 361
+        assert int(get_defaults(base, 'cfgwrap', 'funcname')['b']) == -1
+        assert int(get_defaults(base, 'cfgwrap', 'miss-n/a')['e']) == -2
+        assert int(get_defaults(base, 'cfgwrap', 'funcname')['f']) == -3
+        assert int(get_defaults(base, 'cfgwrap', 'funcname')['e']) == -4
     finally:
         os.chdir(pwd)
 
@@ -80,6 +93,8 @@ def test_pyproject(tmp_path):
             assert get_defaults(tool, '', '')[key] == 99
 
         assert get_defaults('coverage', '', 'report')['show_missing'] is True
+        assert get_defaults('coverage', 'report', '')['show_missing'] is True
+        assert get_defaults('coverage', 'report', 'show_missing')['report']['show_missing'] is True
     finally:
         os.chdir(pwd)
 
