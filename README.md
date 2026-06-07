@@ -30,6 +30,7 @@ Precedence (descending):
   - [platformdirs](https://platformdirs.readthedocs.io/en/latest/parameters.html).{user,site}_config_path(name, False)/
     - `{app}.{toml,yaml,yml,json,ini,cfg}::{func.a,a}`
     - `{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
+  - ./`pyproject.toml::tool.name.{app.func.a,func.a,app.a,a}`
 - signature (`def foo(a=1)`)
 
 ## Installation
@@ -60,6 +61,11 @@ Options:
 Arguments:
   <arg1>         An argument.
   <arg2>         An integer argument [default: 2:int].
+
+Defaults above may be overridden by environment variables or config files:
+- `MYAPP[_CLI]_*`
+- `{.,~/.config/myapp,/etc/xdg/myapp}/myapp[/cli].{toml,yml,json,ini}::[cli.]*`
+- `pyproject.toml::tool.myapp[.cli]*`
 """
 import argopt, shtab, envwrap
 
@@ -69,7 +75,6 @@ if __name__ == "__main__":
     parser = argopt.argopt(__doc__)
     shtab.add_argument_to(parser)
 
-    # get defaults from `MYAPP[_CLI]_*`, `myapp[/cli].{toml,yml,json,ini}::[cli.]*`
     defaults = envwrap.get_defaults("myapp", "", "cli")
     if ONLY_PASS_VALID:
         valid = {i.dest for i in parser._actions}

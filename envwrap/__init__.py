@@ -53,6 +53,19 @@ def get_defaults(name: str, app: str, func: str):
     """In-memory (functools.cache) of overrides extracted from config files & env vars."""
     conf = PlatformDirs(name, False)
     overrides = {}
+    log.debug("Searching in pyproject.toml::tool.%s", name)
+    if (fpath := Path("pyproject.toml")).is_file():
+        try:
+            cfg = read_config(fpath).get('tool', {}).get(name, {})
+            overrides.update(cfg)
+            if app in cfg:
+                overrides.update(cfg[app])
+            if func in cfg:
+                overrides.update(cfg[func])
+            if app in cfg and func in cfg[app]:
+                overrides.update(cfg[app][func])
+        except Exception as exc:
+            log.debug(f"Exception ignored: {exc}")
     for pth, base in (
         (conf.site_config_path, name),
         (conf.site_config_path, app),
@@ -107,6 +120,7 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
         - platformdirs.{user,site}_config_path(name, False)/
             - `{app}.{toml,yaml,yml,json,ini,cfg}::{func.a,a}`
             - `{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
+        - ./`pyproject.toml::tool.name.{app.func.a,func.a,app.a,a}`
     - signature (`def foo(a=1)`)
 
     Parameters

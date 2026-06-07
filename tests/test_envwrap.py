@@ -1,4 +1,6 @@
 import os
+import shutil
+from pathlib import Path
 from sys import version_info
 from textwrap import dedent
 
@@ -64,6 +66,20 @@ def test_conf(tmp_path, ext):
     try:
         f = envwrap('cfgwrap', 'testcfg')(funcname)
         assert f(c=98) == {'a': 1, 'b': 43, 'c': 98, 'd': 361, 'e': 102, 'f': 405}
+    finally:
+        os.chdir(pwd)
+
+
+def test_pyproject(tmp_path):
+    pwd = os.curdir
+    os.chdir(tmp_path)
+    try:
+        shutil.copy(Path(__file__).parent.parent / "pyproject.toml", "pyproject.toml")
+        for tool, key in (('isort', 'line_length'), ('flake8', 'max_line_length'),
+                          ('yapf', 'column_limit')):
+            assert get_defaults(tool, '', '')[key] == 99
+
+        assert get_defaults('coverage', '', 'report')['show_missing'] is True
     finally:
         os.chdir(pwd)
 
