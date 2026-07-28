@@ -4,7 +4,7 @@ import os
 from functools import partial, partialmethod
 
 try:
-    from functools import cache  # py>=3.9
+    from functools import cache  # py>=3.9, yapf: disable
 except ImportError:
     from functools import lru_cache
     cache = lru_cache(maxsize=None)
@@ -22,7 +22,7 @@ def read_config(fpath: PurePath) -> dict:
     ext = fpath.suffix.lower()[1:]
     if ext == 'toml':
         try:
-            from tomllib import loads  # py>=3.11
+            from tomllib import loads  # py>=3.11, yapf: disable
         except ModuleNotFoundError:
             from toml import loads
     elif ext in ('yaml', 'yml'):
