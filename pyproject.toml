@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 
 [tool.setuptools.packages.find]
-exclude = ["tests"]
+include = ["envwrap", "envwrap.*"]
 
 [project.urls]
 repository = "https://github.com/tqdm/envwrap"
