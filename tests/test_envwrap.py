@@ -144,3 +144,16 @@ def test_env_cli(capsys):
 def test_deprecated_underscore():
     with pytest.warns(DeprecationWarning, match="Trailing underscore"):
         envwrap('envwrap_', 'testenv')(funcname)
+
+
+def test_bool(monkeypatch):
+    monkeypatch.setenv('FUNC_default_true', "False")
+    monkeypatch.setenv('FUNC_default_false', "1")
+    monkeypatch.setenv('FUNC_annotated', "0")
+    monkeypatch.setenv('FUNC_fallback', "yes")
+
+    @envwrap("func", types={'fallback': bool})
+    def func(default_true=True, default_false=False, annotated: bool = None, fallback=None):
+        return default_true, default_false, annotated, fallback
+
+    assert (False, True, False, True) == func()

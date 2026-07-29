@@ -4,7 +4,7 @@ import os
 from functools import partial, partialmethod
 
 try:
-    from functools import cache  # py>=3.9
+    from functools import cache  # py>=3.9, yapf: disable
 except ImportError:
     from functools import lru_cache
     cache = lru_cache(maxsize=None)
@@ -22,7 +22,7 @@ def read_config(fpath: PurePath) -> dict:
     ext = fpath.suffix.lower()[1:]
     if ext == 'toml':
         try:
-            from tomllib import loads  # py>=3.11
+            from tomllib import loads  # py>=3.11, yapf: disable
         except ModuleNotFoundError:
             from toml import loads
     elif ext in ('yaml', 'yml'):
@@ -107,6 +107,17 @@ def get_defaults(name: str, app: str, func: str):
     return overrides
 
 
+def cast(value, typ):
+    if typ is bool:
+        val = value.strip().lower()
+        if val in ('true', 'yes', 'on', '1', 'y', 't'):
+            return True
+        if val in ('false', 'no', 'off', '0', 'n', 'f', ''):
+            return False
+        raise TypeError(f"{typ}: {val}")
+    return typ(value)
+
+
 def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
     """Function decorator overriding default arguments.
 
@@ -168,16 +179,16 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
             if param.annotation is not param.empty: # typehints
                 for typ in getattr(param.annotation, '__args__', (param.annotation,)):
                     try:
-                        overrides[k] = typ(overrides[k])
+                        overrides[k] = cast(overrides[k], typ)
                     except Exception:
                         log.debug("Failed to convert %s to %s", overrides[k], typ)
                     else:
                         break
             elif param.default is not None:         # type of default value
-                overrides[k] = type(param.default)(overrides[k])
+                overrides[k] = cast(overrides[k], type(param.default))
             else:
                 try:                                # `types` fallback
-                    overrides[k] = types[k](overrides[k])
+                    overrides[k] = cast(overrides[k], types[k])
                 except KeyError:                    # keep unconverted (`str`)
                     pass
         log.debug("Typed overrides: %s", overrides)

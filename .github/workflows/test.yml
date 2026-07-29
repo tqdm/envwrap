@@ -10,14 +10,14 @@ jobs:
       matrix:
         python: [3.8, 3.9, '3.10', 3.11, 3.12, 3.13, 3.14]
         os: [ubuntu]
-        include: [{os: macos, python: 3.13}, {os: windows, python: 3.13}]
+        include: [{os: macos, python: 3.14}, {os: windows, python: 3.14}]
     runs-on: ${{ matrix.os }}-latest
     timeout-minutes: 5
     defaults: {run: {shell: bash}}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with: {fetch-depth: 0}
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with:
         python-version: ${{ matrix.python }}
     - run: pip install -e .[dev]
@@ -26,7 +26,7 @@ jobs:
       with:
         flag-name: ${{ matrix.python }}-${{ matrix.os }}
         parallel: true
-    - uses: codecov/codecov-action@v6
+    - uses: codecov/codecov-action@v7
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         flags: ${{ matrix.python }}, ${{ matrix.os }}
@@ -53,11 +53,11 @@ jobs:
     environment: pypi
     permissions: {contents: write, id-token: write, packages: write}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
         token: ${{ secrets.GH_TOKEN || github.token }}
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with: {python-version: '3.x'}
     - id: dist
       uses: casperdcl/deploy-pypi@v3
@@ -69,6 +69,6 @@ jobs:
       run: |
         changelog=$(git log --pretty='format:%d%n- %s%n%b---' $(git tag --sort=v:refname | tail -n2 | head -n1)..HEAD)
         tag="${GITHUB_REF#refs/tags/}"
-        gh release create --title "envwrap $tag beta" --draft --notes "$changelog" "$tag" dist/${{ steps.dist.outputs.whl }}
+        gh release create --title "envwrap $tag stable" --draft --notes "$changelog" "$tag" dist/${{ steps.dist.outputs.whl }}
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
