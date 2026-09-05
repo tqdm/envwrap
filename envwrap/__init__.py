@@ -21,7 +21,7 @@ try:
 except ImportError:
     UNIONS = (Union,)
 CONTAINERS = list, tuple, set, frozenset, dict, bytes, bytearray
-NONES = frozenset(('none', 'null', 'nil', 'undefined', ''))
+NONES = frozenset(('none', 'null', ''))
 TRUES = frozenset(('true', 'yes', 'on', '1', 'y', 't'))
 FALSES = frozenset(('false', 'no', 'off', '0', 'n', 'f', ''))
 log = logging.getLogger(__name__)

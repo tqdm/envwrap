@@ -150,11 +150,14 @@ def test_bool(monkeypatch):
 
 
 def test_none(monkeypatch):
-    for k, v in {'optional': "none", 'fallback': "", 'keep': "nil", 'empty': ""}.items():
+    for k, v in {
+            'optional': "none", 'hinted': "NULL", 'default': " none ", 'fallback': "",
+            'keep': "none", 'empty': ""}.items():
         monkeypatch.setenv(f"NONEWRAP_{k}", v)
 
     @envwrap("nonewrap", types={'fallback': Optional[int]})
-    def func(optional: Optional[int] = 5, fallback=1, keep="s", empty="s"):
-        return optional, fallback, keep, empty
+    def func(optional: Optional[int] = 5, hinted: int = None, default=None, fallback=1, keep="s",
+             empty="s"):
+        return optional, hinted, default, fallback, keep, empty
 
-    assert func() == (None, None, "nil", "")
+    assert func() == (None, None, None, None, "none", "")
