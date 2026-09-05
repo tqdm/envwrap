@@ -58,8 +58,8 @@ def read_config(fpath: PurePath) -> dict:
 
 
 @cache
-def get_defaults(name: str, app: str, func: str):
-    """In-memory (functools.cache) of overrides extracted from config files & env vars."""
+def _defaults(name: str, app: str, func: str) -> tuple:
+    """config, env"""
     conf = PlatformDirs(name, False)
     overrides = {}
     log.debug("Searching in pyproject.toml::tool.%s", name)
@@ -108,12 +108,22 @@ def get_defaults(name: str, app: str, func: str):
         prefixes = name, f"{name}_{app}", f"{name}_{func}", f"{name}_{app}_{func}"
     else:
         prefixes = name, f"{name}_{func}"
+    env = {}
     for prefix in prefixes:
         prefix = prefix.upper() + "_"
         log.debug(f"Looking for variables: {prefix}*")
-        overrides.update(
+        env.update(
             (k[len(prefix):].lower(), v) for k, v in os.environ.items() if k.startswith(prefix))
-    return overrides
+    return overrides, env
+
+
+def get_defaults(name: str, app: str, func: str) -> dict:
+    """In-memory (functools.cache) of overrides extracted from config files & env vars."""
+    config, env = _defaults(name, app, func)
+    return {**config, **env}
+
+
+get_defaults.cache_clear = _defaults.cache_clear
 
 
 def cast(value, typ):
@@ -158,7 +168,7 @@ def _candidate_types(param, types, key):
     yield from _iter_union_types(fallback)
 
 
-def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
+def envwrap(name: str, app: str = "", types: dict = None, is_method=False, convert_config=True):
     """Function decorator overriding default arguments.
 
     Precedence (descending):
@@ -175,6 +185,7 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
     - signature (`def foo(a=1)`)
 
     Typecasting precedence (descending):
+    - if `convert_config=False`: unconverted config file value
     - typehint
     - default value's type
     - `types[...]`
@@ -192,6 +203,8 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
         Consider using `types=collections.defaultdict(lambda: ast.literal_eval)`.
     is_method:
         Whether to use `functools.partialmethod`. If (default: False) use `functools.partial`.
+    convert_config:
+        Whether (default: True) to typecast config file values (see precedence above).
 
     Examples
     --------
@@ -215,12 +228,15 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
 
     def wrap(func):
         params = signature(func).parameters
-        defaults = get_defaults(name, app, func.__name__)
+        config, env = _defaults(name, app, func.__name__)
         # ignore unknown params
-        overrides = {k: v for k, v in defaults.items() if k in params}
+        overrides = {k: v for k, v in {**config, **env}.items() if k in params}
         log.debug("Loaded overrides for %s: %s", func.__name__, overrides)
         # infer overrides' `type`s
         for k, value in overrides.items():
+            if not convert_config and k not in env:
+                log.debug("Keeping config %s=%r unconverted", k, value)
+                continue
             for typ in _candidate_types(params[k], types, k):
                 try:
                     overrides[k] = cast(value, typ)
