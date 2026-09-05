@@ -10,10 +10,20 @@ except ImportError:
     cache = lru_cache(maxsize=None)
 from inspect import signature
 from pathlib import Path, PurePath
+from typing import Union, get_args, get_origin
 from warnings import warn
 
 from platformdirs import PlatformDirs
 
+try:
+    from types import UnionType  # py>=3.10, yapf: disable
+    UNIONS = (Union, UnionType)
+except ImportError:
+    UNIONS = (Union,)
+CONTAINERS = list, tuple, set, frozenset, dict, bytes, bytearray
+NONES = frozenset(('none', 'null', 'nil', 'undefined', ''))
+TRUES = frozenset(('true', 'yes', 'on', '1', 'y', 't'))
+FALSES = frozenset(('false', 'no', 'off', '0', 'n', 'f', ''))
 log = logging.getLogger(__name__)
 
 
@@ -107,18 +117,45 @@ def get_defaults(name: str, app: str, func: str):
 
 
 def cast(value, typ):
-    if typ is bool:
-        val = value.strip().lower()
-        if val in ('true', 'yes', 'on', '1', 'y', 't'):
-            return True
-        if val in ('false', 'no', 'off', '0', 'n', 'f', ''):
-            return False
-        raise TypeError(f"{typ}: {val}")
-    if typ is type(None) or typ is None:
-        if value.strip().lower() in ('none', 'null', 'nil', 'undefined', ''):
+    """`typ(value)` but:
+    - supports word-like str conversion to `bool` and `None`
+    - passes non-`str` `value`s (e.g. already parsed upstream)
+    """
+    if typ is None or typ is type(None):
+        if value is None or (isinstance(value, str) and value.strip().lower() in NONES):
             return None
         raise TypeError(f"{typ}: {value}")
+    base = get_origin(typ) or typ        # `list[int]` -> `list`
+    if isinstance(base, type):
+        if issubclass(base, CONTAINERS): # would mangle `str`s char-by-char
+            raise TypeError(f"{typ}: unparseable; use `types={{'param_name': ast.literal_eval}}`")
+        if isinstance(value, base):
+            return value
+    if not isinstance(value, str):
+        return typ(value)
+    if typ is bool:
+        if (val := value.strip().lower()) in TRUES:
+            return True
+        if val in FALSES:
+            return False
+        raise TypeError(f"{typ}: {val}")
     return typ(value)
+
+
+def _iter_union_types(typ):
+    return get_args(typ) if get_origin(typ) in UNIONS else (typ,)
+
+
+def _candidate_types(param, types, key):
+    if param.annotation is not param.empty: # typehints
+        yield from _iter_union_types(param.annotation)
+    if param.default is not param.empty:    # type of default value
+        yield type(param.default)
+    try:
+        fallback = types[key]               # `types` fallback (maybe a `defaultdict`)
+    except KeyError:
+        return
+    yield from _iter_union_types(fallback)
 
 
 def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
@@ -136,6 +173,12 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
             - `{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
         - ./`pyproject.toml::tool.name.{app.func.a,func.a,app.a,a}`
     - signature (`def foo(a=1)`)
+
+    Typecasting precedence (descending):
+    - typehint
+    - default value's type
+    - `types[...]`
+    - unconverted
 
     Parameters
     ----------
@@ -177,36 +220,16 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
         overrides = {k: v for k, v in defaults.items() if k in params}
         log.debug("Loaded overrides for %s: %s", func.__name__, overrides)
         # infer overrides' `type`s
-        for k in overrides:
-            success = False
-            param = params[k]
-            if param.annotation is not param.empty:       # typehints
-                for typ in getattr(param.annotation, '__args__', (param.annotation,)):
-                    try:
-                        overrides[k] = cast(overrides[k], typ)
-                    except Exception:
-                        log.debug("Failed to convert %s to %s", overrides[k], typ)
-                    else:
-                        success = True
-                        break
-            if not success and param.default is not None: # type of default value
+        for k, value in overrides.items():
+            for typ in _candidate_types(params[k], types, k):
                 try:
-                    overrides[k] = cast(overrides[k], type(param.default))
-                    success = True
+                    overrides[k] = cast(value, typ)
                 except Exception:
-                    log.debug("Failed to convert %s to %s", overrides[k], type(param.default))
-            if not success:                               # `types` fallback
-                try:
-                    for typ in getattr(types[k], '__args__', (types[k],)):
-                        try:
-                            overrides[k] = cast(overrides[k], typ)
-                        except Exception:
-                            log.debug("Failed to convert %s to %s", overrides[k], typ)
-                        else:
-                            success = True
-                            break
-                except KeyError:                          # keep unconverted (`str`)
-                    pass
+                    log.debug("Failed to convert %s to %s", value, typ)
+                else:
+                    break
+            else:  # keep unconverted (`str` or config type)
+                log.debug("Keeping %s=%r unconverted", k, value)
         log.debug("Typed overrides: %s", overrides)
         return part(func, **overrides)
 
