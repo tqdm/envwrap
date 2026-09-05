@@ -139,3 +139,7 @@ will print:
 will use defaults:
 {'a': '42', 'b': 2, ...}
 ```
+
+---
+
+[![contributors](https://git-fame.cdcl.ml/gh/tqdm/envwrap?enum=1&auth=share)](https://git-fame.cdcl.ml/gh/tqdm/envwrap?enum=1&auth=share)
