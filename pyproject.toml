@@ -70,7 +70,6 @@ blank_line_before_nested_class_or_def = false
 
 [tool.isort]
 line_length = 99
-multi_line_output = 4
 known_first_party = ["envwrap", "tests"]
 
 [tool.pytest.ini_options]

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/tqdm/envwrap/actions/workflows/test.yml/badge.svg)](https://github.com/tqdm/envwrap/actions/workflows/test.yml)
 [![coveralls](https://img.shields.io/coveralls/github/tqdm/envwrap/main?logo=coveralls)](https://coveralls.io/github/tqdm/envwrap)
-[![codecov](https://codecov.io/gh/tqdm/envwrap/graph/badge.svg?token=PEWICBIPVW)](https://codecov.io/gh/tqdm/envwrap)
+[![codecov](https://codecov.io/gh/tqdm/envwrap/branch/main/graph/badge.svg)](https://codecov.io/gh/tqdm/envwrap)
 [![codacy](https://app.codacy.com/project/badge/Grade/6ca7a441560444489fd5c5b1548ab0de)](https://app.codacy.com/gh/tqdm/envwrap/dashboard)
 
 [![releases](https://img.shields.io/pypi/v/envwrap.svg?label=changelog)](https://github.com/tqdm/envwrap/releases)
