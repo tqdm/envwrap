@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 from sys import version_info
 from textwrap import dedent
+from typing import Optional
 
 import pytest
 
@@ -157,3 +158,14 @@ def test_bool(monkeypatch):
         return default_true, default_false, annotated, fallback
 
     assert (False, True, False, True) == func()
+
+
+def test_none(monkeypatch):
+    for k, v in {'optional': "none", 'fallback': "", 'keep': "nil", 'empty': ""}.items():
+        monkeypatch.setenv(f"NONEWRAP_{k}", v)
+
+    @envwrap("nonewrap", types={'fallback': Optional[int]})
+    def func(optional: Optional[int] = 5, fallback=1, keep="s", empty="s"):
+        return optional, fallback, keep, empty
+
+    assert func() == (None, None, "nil", "")

@@ -115,6 +115,10 @@ def cast(value, typ):
         if val in ('false', 'no', 'off', '0', 'n', 'f', ''):
             return False
         raise TypeError(f"{typ}: {val}")
+    if typ is type(None) or typ is None:
+        if value.strip().lower() in ('none', 'null', 'nil', 'undefined', ''):
+            return None
+        raise TypeError(f"{typ}: {value}")
     return typ(value)
 
 
@@ -175,21 +179,34 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
         log.debug("Loaded overrides for %s: %s", func.__name__, overrides)
         # infer overrides' `type`s
         for k in overrides:
+            success = False
             param = params[k]
-            if param.annotation is not param.empty: # typehints
+            if param.annotation is not param.empty:       # typehints
                 for typ in getattr(param.annotation, '__args__', (param.annotation,)):
                     try:
                         overrides[k] = cast(overrides[k], typ)
                     except Exception:
                         log.debug("Failed to convert %s to %s", overrides[k], typ)
                     else:
+                        success = True
                         break
-            elif param.default is not None:         # type of default value
-                overrides[k] = cast(overrides[k], type(param.default))
-            else:
-                try:                                # `types` fallback
-                    overrides[k] = cast(overrides[k], types[k])
-                except KeyError:                    # keep unconverted (`str`)
+            if not success and param.default is not None: # type of default value
+                try:
+                    overrides[k] = cast(overrides[k], type(param.default))
+                    success = True
+                except Exception:
+                    log.debug("Failed to convert %s to %s", overrides[k], type(param.default))
+            if not success:                               # `types` fallback
+                try:
+                    for typ in getattr(types[k], '__args__', (types[k],)):
+                        try:
+                            overrides[k] = cast(overrides[k], typ)
+                        except Exception:
+                            log.debug("Failed to convert %s to %s", overrides[k], typ)
+                        else:
+                            success = True
+                            break
+                except KeyError:                          # keep unconverted (`str`)
                     pass
         log.debug("Typed overrides: %s", overrides)
         return part(func, **overrides)
