@@ -37,8 +37,7 @@ def read_config(fpath: PurePath) -> dict:
         for sec in parser.sections():
             if sec.count('.') == 1:
                 parent, child = sec.split('.', 1)
-                res.setdefault(parent, {}).setdefault(child, {})
-                res[parent][child] |= parser.items(sec)
+                res.setdefault(parent, {}).setdefault(child, {}).update(parser.items(sec))
             elif sec.count('.') > 1:
                 warn(f"Skipping nested section: {sec}", UserWarning, stacklevel=2)
         return res

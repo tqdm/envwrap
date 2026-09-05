@@ -1,7 +1,6 @@
 import os
 import shutil
 from pathlib import Path
-from sys import version_info
 from textwrap import dedent
 from typing import Optional
 
@@ -57,47 +56,37 @@ def test_env():
 
 @pytest.mark.parametrize('ext', ['toml', 'yaml', 'yml', 'json', 'ini', 'cfg'])
 @pytest.mark.parametrize('base', ['cfgwrap', 'testcfg'])
-def test_conf(tmp_path, base, ext):
-    if version_info < (3, 9) and ext in ('ini', 'cfg'):
-        pytest.skip("configparser dict merging requires python>=3.9")
+def test_conf(tmp_path, monkeypatch, base, ext):
     config = {
         'testcfg': {'b': 43, 'c': 1338, 'd': 361,
                     'funcname': {'f': 405}}, 'funcname': {'e': 102, 'a': 0},
         'cfgwrap': {'b': -1, 'e': -2, 'f': -3, 'funcname': {'e': -4}}}
     write_config(tmp_path / f"{base}.{ext}", config)
-    pwd = os.curdir
-    os.chdir(tmp_path)
-    try:
-        wrapped = envwrap('cfgwrap', 'testcfg')(funcname)
-        if base == 'cfgwrap':
-            assert wrapped(c=98) == {'a': 0, 'b': 43, 'c': 98, 'd': 361, 'e': 102, 'f': 405}
-        else:
-            assert wrapped(c=98) == {'a': None, 'b': 2, 'c': 98, 'd': 4, 'e': 5, 'f': 6}
-        assert int(get_defaults(base, 'testcfg', 'funcname')['a']) == 0
-        assert int(get_defaults(base, 'testcfg', 'funcname')['f']) == 405
-        assert int(get_defaults(base, 'testcfg', 'miss-n/a')['d']) == 361
-        assert int(get_defaults(base, 'cfgwrap', 'funcname')['b']) == -1
-        assert int(get_defaults(base, 'cfgwrap', 'miss-n/a')['e']) == -2
-        assert int(get_defaults(base, 'cfgwrap', 'funcname')['f']) == -3
-        assert int(get_defaults(base, 'cfgwrap', 'funcname')['e']) == -4
-    finally:
-        os.chdir(pwd)
+    monkeypatch.chdir(tmp_path)
+    wrapped = envwrap('cfgwrap', 'testcfg')(funcname)
+    if base == 'cfgwrap':
+        assert wrapped(c=98) == {'a': 0, 'b': 43, 'c': 98, 'd': 361, 'e': 102, 'f': 405}
+    else:
+        assert wrapped(c=98) == {'a': None, 'b': 2, 'c': 98, 'd': 4, 'e': 5, 'f': 6}
+    assert int(get_defaults(base, 'testcfg', 'funcname')['a']) == 0
+    assert int(get_defaults(base, 'testcfg', 'funcname')['f']) == 405
+    assert int(get_defaults(base, 'testcfg', 'miss-n/a')['d']) == 361
+    assert int(get_defaults(base, 'cfgwrap', 'funcname')['b']) == -1
+    assert int(get_defaults(base, 'cfgwrap', 'miss-n/a')['e']) == -2
+    assert int(get_defaults(base, 'cfgwrap', 'funcname')['f']) == -3
+    assert int(get_defaults(base, 'cfgwrap', 'funcname')['e']) == -4
 
 
-def test_pyproject(tmp_path):
-    pwd = os.curdir
-    os.chdir(tmp_path)
-    try:
-        shutil.copy(Path(__file__).parent.parent / "pyproject.toml", "pyproject.toml")
-        for tool, key in (('isort', 'line_length'), ('flake8', 'max_line_length'),
-                          ('yapf', 'column_limit')):
-            assert get_defaults(tool, '', '')[key] == 99
+def test_pyproject(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    shutil.copy(Path(__file__).parent.parent / "pyproject.toml", "pyproject.toml")
+    for tool, key in (('isort', 'line_length'), ('flake8', 'max_line_length'), ('yapf',
+                                                                                'column_limit')):
+        assert get_defaults(tool, '', '')[key] == 99
 
-        assert get_defaults('coverage', '', 'report')['show_missing'] is True
-        assert get_defaults('coverage', 'report', '')['show_missing'] is True
-        assert get_defaults('coverage', 'report', 'show_missing')['report']['show_missing'] is True
-    finally:
-        os.chdir(pwd)
+    assert get_defaults('coverage', '', 'report')['show_missing'] is True
+    assert get_defaults('coverage', 'report', '')['show_missing'] is True
+    assert get_defaults('coverage', 'report', 'show_missing')['report']['show_missing'] is True
 
 
 def test_env_cli(capsys):
