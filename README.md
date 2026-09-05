@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/tqdm/envwrap/actions/workflows/test.yml/badge.svg)](https://github.com/tqdm/envwrap/actions/workflows/test.yml)
 [![coveralls](https://img.shields.io/coveralls/github/tqdm/envwrap/main?logo=coveralls)](https://coveralls.io/github/tqdm/envwrap)
-[![codecov](https://codecov.io/gh/tqdm/envwrap/graph/badge.svg?token=PEWICBIPVW)](https://codecov.io/gh/tqdm/envwrap)
+[![codecov](https://codecov.io/gh/tqdm/envwrap/branch/main/graph/badge.svg)](https://codecov.io/gh/tqdm/envwrap)
 [![codacy](https://app.codacy.com/project/badge/Grade/6ca7a441560444489fd5c5b1548ab0de)](https://app.codacy.com/gh/tqdm/envwrap/dashboard)
 
 [![releases](https://img.shields.io/pypi/v/envwrap.svg?label=changelog)](https://github.com/tqdm/envwrap/releases)
@@ -19,7 +19,9 @@ def func(a=1):
     ...
 ```
 
-Precedence (descending):
+## Lookup precedence
+
+In descending order:
 
 - call (`func(a=3)`)
 - environment (`NAME_APP_FUNC_A=2`, `NAME_FUNC_A=2`, `NAME_APP_A=2`, `NAME_A=2`)
@@ -32,6 +34,25 @@ Precedence (descending):
     - `{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
   - ./`pyproject.toml::tool.name.{app.func.a,func.a,app.a,a}`
 - signature (`def foo(a=1)`)
+
+## Typecasting precedence
+
+In descending order:
+
+- if `envwrap.envwrap(convert_config=False)`: unconverted config file value,
+- if `convert_config=False`: unconverted config file value
+- signature value's typehint
+- signature default value's type
+- `envwrap.envwrap(types={'param_name': type})`
+- unconverted
+
+type | accepted string values
+-- | --
+`bool` | `true`, `yes`, `on`, `1`, `y`, `t` / `false`, `no`, `off`, `0`, `n`, `f`, `` (empty)
+`None` | `none`, `null`, `` (empty)
+
+> [!TIP]
+> Containers (`list`, `dict`, ...) aren't parsed to avoid mangling strings; use e.g. `types={'param_name': ast.literal_eval}` instead.
 
 ## Installation
 
@@ -118,3 +139,7 @@ will print:
 will use defaults:
 {'a': '42', 'b': 2, ...}
 ```
+
+---
+
+[![contributors](https://git-fame.cdcl.ml/gh/tqdm/envwrap?enum=1&auth=share)](https://git-fame.cdcl.ml/gh/tqdm/envwrap?enum=1&auth=share)

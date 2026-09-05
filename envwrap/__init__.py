@@ -10,10 +10,20 @@ except ImportError:
     cache = lru_cache(maxsize=None)
 from inspect import signature
 from pathlib import Path, PurePath
+from typing import Union, get_args, get_origin
 from warnings import warn
 
 from platformdirs import PlatformDirs
 
+try:
+    from types import UnionType  # py>=3.10, yapf: disable
+    UNIONS = (Union, UnionType)
+except ImportError:
+    UNIONS = (Union,)
+CONTAINERS = list, tuple, set, frozenset, dict, bytes, bytearray
+NONES = frozenset(('none', 'null', ''))
+TRUES = frozenset(('true', 'yes', 'on', '1', 'y', 't'))
+FALSES = frozenset(('false', 'no', 'off', '0', 'n', 'f', ''))
 log = logging.getLogger(__name__)
 
 
@@ -37,8 +47,7 @@ def read_config(fpath: PurePath) -> dict:
         for sec in parser.sections():
             if sec.count('.') == 1:
                 parent, child = sec.split('.', 1)
-                res.setdefault(parent, {}).setdefault(child, {})
-                res[parent][child] |= parser.items(sec)
+                res.setdefault(parent, {}).setdefault(child, {}).update(parser.items(sec))
             elif sec.count('.') > 1:
                 warn(f"Skipping nested section: {sec}", UserWarning, stacklevel=2)
         return res
@@ -49,8 +58,8 @@ def read_config(fpath: PurePath) -> dict:
 
 
 @cache
-def get_defaults(name: str, app: str, func: str):
-    """In-memory (functools.cache) of overrides extracted from config files & env vars."""
+def _defaults(name: str, app: str, func: str) -> tuple:
+    """config, env"""
     conf = PlatformDirs(name, False)
     overrides = {}
     log.debug("Searching in pyproject.toml::tool.%s", name)
@@ -99,26 +108,67 @@ def get_defaults(name: str, app: str, func: str):
         prefixes = name, f"{name}_{app}", f"{name}_{func}", f"{name}_{app}_{func}"
     else:
         prefixes = name, f"{name}_{func}"
+    env = {}
     for prefix in prefixes:
         prefix = prefix.upper() + "_"
         log.debug(f"Looking for variables: {prefix}*")
-        overrides.update(
+        env.update(
             (k[len(prefix):].lower(), v) for k, v in os.environ.items() if k.startswith(prefix))
-    return overrides
+    return overrides, env
+
+
+def get_defaults(name: str, app: str, func: str) -> dict:
+    """In-memory (functools.cache) of overrides extracted from config files & env vars."""
+    config, env = _defaults(name, app, func)
+    return {**config, **env}
+
+
+get_defaults.cache_clear = _defaults.cache_clear
 
 
 def cast(value, typ):
+    """`typ(value)` but:
+    - supports word-like str conversion to `bool` and `None`
+    - passes non-`str` `value`s (e.g. already parsed upstream)
+    """
+    if typ is None or typ is type(None):
+        if value is None or (isinstance(value, str) and value.strip().lower() in NONES):
+            return None
+        raise TypeError(f"{typ}: {value}")
+    base = get_origin(typ) or typ        # `list[int]` -> `list`
+    if isinstance(base, type):
+        if issubclass(base, CONTAINERS): # would mangle `str`s char-by-char
+            raise TypeError(f"{typ}: unparseable; use `types={{'param_name': ast.literal_eval}}`")
+        if isinstance(value, base):
+            return value
+    if not isinstance(value, str):
+        return typ(value)
     if typ is bool:
-        val = value.strip().lower()
-        if val in ('true', 'yes', 'on', '1', 'y', 't'):
+        if (val := value.strip().lower()) in TRUES:
             return True
-        if val in ('false', 'no', 'off', '0', 'n', 'f', ''):
+        if val in FALSES:
             return False
         raise TypeError(f"{typ}: {val}")
     return typ(value)
 
 
-def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
+def _iter_union_types(typ):
+    return get_args(typ) if get_origin(typ) in UNIONS else (typ,)
+
+
+def _candidate_types(param, types, key):
+    if param.annotation is not param.empty: # typehints
+        yield from _iter_union_types(param.annotation)
+    if param.default is not param.empty:    # type of default value
+        yield type(param.default)
+    try:
+        fallback = types[key]               # `types` fallback (maybe a `defaultdict`)
+    except KeyError:
+        return
+    yield from _iter_union_types(fallback)
+
+
+def envwrap(name: str, app: str = "", types: dict = None, is_method=False, convert_config=True):
     """Function decorator overriding default arguments.
 
     Precedence (descending):
@@ -134,6 +184,13 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
         - ./`pyproject.toml::tool.name.{app.func.a,func.a,app.a,a}`
     - signature (`def foo(a=1)`)
 
+    Typecasting precedence (descending):
+    - if `convert_config=False`: unconverted config file value
+    - typehint
+    - default value's type
+    - `types[...]`
+    - unconverted
+
     Parameters
     ----------
     name:
@@ -146,6 +203,8 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
         Consider using `types=collections.defaultdict(lambda: ast.literal_eval)`.
     is_method:
         Whether to use `functools.partialmethod`. If (default: False) use `functools.partial`.
+    convert_config:
+        Whether (default: True) to typecast config file values (see precedence above).
 
     Examples
     --------
@@ -169,28 +228,24 @@ def envwrap(name: str, app: str = "", types: dict = None, is_method=False):
 
     def wrap(func):
         params = signature(func).parameters
-        defaults = get_defaults(name, app, func.__name__)
+        config, env = _defaults(name, app, func.__name__)
         # ignore unknown params
-        overrides = {k: v for k, v in defaults.items() if k in params}
+        overrides = {k: v for k, v in {**config, **env}.items() if k in params}
         log.debug("Loaded overrides for %s: %s", func.__name__, overrides)
         # infer overrides' `type`s
-        for k in overrides:
-            param = params[k]
-            if param.annotation is not param.empty: # typehints
-                for typ in getattr(param.annotation, '__args__', (param.annotation,)):
-                    try:
-                        overrides[k] = cast(overrides[k], typ)
-                    except Exception:
-                        log.debug("Failed to convert %s to %s", overrides[k], typ)
-                    else:
-                        break
-            elif param.default is not None:         # type of default value
-                overrides[k] = cast(overrides[k], type(param.default))
-            else:
-                try:                                # `types` fallback
-                    overrides[k] = cast(overrides[k], types[k])
-                except KeyError:                    # keep unconverted (`str`)
-                    pass
+        for k, value in overrides.items():
+            if not convert_config and k not in env:
+                log.debug("Keeping config %s=%r unconverted", k, value)
+                continue
+            for typ in _candidate_types(params[k], types, k):
+                try:
+                    overrides[k] = cast(value, typ)
+                except Exception:
+                    log.debug("Failed to convert %s to %s", value, typ)
+                else:
+                    break
+            else:  # keep unconverted (`str` or config type)
+                log.debug("Keeping %s=%r unconverted", k, value)
         log.debug("Typed overrides: %s", overrides)
         return part(func, **overrides)
 
