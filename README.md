@@ -19,7 +19,9 @@ def func(a=1):
     ...
 ```
 
-Precedence (descending):
+## Lookup precedence
+
+In descending order:
 
 - call (`func(a=3)`)
 - environment (`NAME_APP_FUNC_A=2`, `NAME_FUNC_A=2`, `NAME_APP_A=2`, `NAME_A=2`)
@@ -32,6 +34,25 @@ Precedence (descending):
     - `{name}.{toml,yaml,yml,json,ini,cfg}::{app.func.a,func.a,app.a,a}`
   - ./`pyproject.toml::tool.name.{app.func.a,func.a,app.a,a}`
 - signature (`def foo(a=1)`)
+
+## Typecasting precedence
+
+In descending order:
+
+- if `envwrap.envwrap(convert_config=False)`: unconverted config file value,
+- if `convert_config=False`: unconverted config file value
+- signature value's typehint
+- signature default value's type
+- `envwrap.envwrap(types={'param_name': type})`
+- unconverted
+
+type | accepted string values
+-- | --
+`bool` | `true`, `yes`, `on`, `1`, `y`, `t` / `false`, `no`, `off`, `0`, `n`, `f`, `` (empty)
+`None` | `none`, `null`, `` (empty)
+
+> [!TIP]
+> Containers (`list`, `dict`, ...) aren't parsed to avoid mangling strings; use e.g. `types={'param_name': ast.literal_eval}` instead.
 
 ## Installation
 
